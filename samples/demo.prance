@@ -1,0 +1,163 @@
+foo(x: 0, y: 5)
+
+fun foo(x: Int , y: Int) Int {
+  var ret: Int
+  ret = 10
+  ret = ret + x
+  ret = ret - y
+  return ret
+}
+
+fun bar(x: Double, y: Double) Double {
+  var i: Double
+  var ans: Double
+  ans = 1.0
+  for(i = x;  i < y; i = i + 1.0) {
+    ans = ans * 2.0
+  }
+  return ans
+}
+
+foo(x: 3, y: 5)
+foo(x: 0, y: 0)
+foo(x: 1, y: 0)
+foo(x: 0, y: 1)
+
+bar(x: 0.0, y: 0.0)
+bar(x: 1.0, y: 0.0)
+bar(x: 0.0, y: 4.0)
+bar(x: 23.0, y: 27.0)
+
+fun ifFunc() Double {
+  var x: Double
+  if (51 == 50) {
+    x = 40.0
+  } else {
+    x = 0.0
+    x = 2.0
+  }
+
+  return x
+}
+
+ifFunc()
+
+// comments - done
+
+// debug information fix EOF errors
+
+// refactor structure - Done new lexer and parser
+
+// fix if-else - Done, no longer returns and uses braces
+
+// make prints explicit only - done
+print(line: "Hello world")
+print(line: "Second line")
+// switch
+
+// structs - done
+
+type Color {
+  var red: Int
+  var green: Int
+  var blue: Int
+  var alpha: Int
+
+  fun printName() {
+    print(line: "I am a color")
+    self.red = self.red - 1
+    if (self.red > 0) {
+      self.printName()
+    }
+  }
+}
+
+type Square {
+ var sideLength: Int
+ var color: Color
+}
+
+fun structFun() {
+  var green: Color 
+  green = Color(red: 10, green: 1, blue: 2, alpha: 3)
+  green.printName()
+}
+
+structFun()
+
+// Init struct - done
+
+fun structs() Color {
+  var green: Color 
+  green = Color(red: 10, green: 1, blue: 2, alpha: 3)
+
+  var square: Square 
+  square = Square(sideLength: 2, color: green)
+
+  return square.color
+}
+
+fun subStruct() Int {
+  var structColor: Color
+  structColor = structs()
+  return structColor.green
+}
+
+subStruct()
+
+// Chain member references
+fun chainStruct() Int {
+  var green: Color 
+  green = Color(red: 0, green: 1, blue: 2, alpha: 3)
+  
+  var square: Square 
+  square = Square(sideLength: 2, color: green)
+  
+  return square.color.alpha
+}
+
+chainStruct()
+
+// arrays
+
+// dictionaries
+
+// Strings - static done
+
+// Multi file
+
+// struct methods - done
+
+// protocols
+
+protocol Speaker {
+  fun speak() String
+}
+
+type Dog: Speaker {
+  fun speak() String {
+    return "Woof"
+  }
+}
+
+type Human: Speaker {
+  fun speak() String {
+    return "Hello"
+  }
+}
+
+fun speaking() {
+  var speaker: Speaker
+  speaker = Dog()
+  print(line: speaker.speak())
+  speaker = Human()
+  print(line: speaker.speak())
+}
+
+speaking()
+
+// protocol extensions
+
+// variable dec+assign on one line
+
+// parameter labels in call - done

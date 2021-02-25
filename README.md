@@ -3,8 +3,6 @@ A language and LLVM based compiler for teaching/learning about [Protocol Oriente
 
 Prance code uses an Object-oriented style without type inheritence. This is intended to prompt users into finding non heirarchical solutions to problems.
 
-** Coming soon ** 
-
 **v0.1**
 
 Support for:
@@ -21,3 +19,15 @@ Support for:
   - functions
 - arithmetic operators
 - logical comparators
+
+## Getting started
+get llvm `brew install llvm@11`
+clone this repo 
+run `swift build`
+run `swift package generate-xcodeproj`
+open `prance.xcodeproj`
+run `swift ./DerivedData/prance/SourcePackages/checkouts/LLVMSwift/utils/make-pkgconfig.swift`
+build in XCode
+compiled `Prance` binary should reside in ./DerivedData/Prance/Build/Products/Debug/Prance
+compile the demo code at `samples/demo.prance` by calling `./Prance demo.prance`
+run the demo code `./demo`
