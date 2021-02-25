@@ -22,12 +22,21 @@ Support for:
 
 ## Getting started
 get llvm `brew install llvm@11`
+
 clone this repo 
+
 run `swift build`
+
 run `swift package generate-xcodeproj`
+
 open `prance.xcodeproj`
+
 run `swift ./DerivedData/prance/SourcePackages/checkouts/LLVMSwift/utils/make-pkgconfig.swift`
+
 build in XCode
+
 compiled `Prance` binary should reside in ./DerivedData/Prance/Build/Products/Debug/Prance
+
 compile the demo code at `samples/demo.prance` by calling `./Prance demo.prance`
+
 run the demo code `./demo`
