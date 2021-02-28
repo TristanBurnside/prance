@@ -20,6 +20,9 @@ Support for:
 - arithmetic operators
 - logical comparators
 
+## Learn more
+To learn more about the language please read the [language guide](./Docs/intro.md).
+
 ## Getting started
 get llvm `brew install llvm@11`
 
