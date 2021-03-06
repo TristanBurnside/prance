@@ -92,7 +92,9 @@ final class TypeResolver: ASTChecker {
       for arg in function.prototype.params {
         parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
       }
-      function.typedExpr = try resolveTypes(for: function.expr)
+      if function.typedExpr == nil {
+        function.typedExpr = try resolveTypes(for: function.expr)
+      }
       parameterValues.endFrame()
     }
     file.typedExpressions = try resolveTypes(for: file.expressions)

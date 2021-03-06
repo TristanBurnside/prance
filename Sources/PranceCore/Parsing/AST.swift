@@ -96,7 +96,6 @@ final class FunctionDefinition {
 struct FunctionCall {
   let name: String
   let args: [FunctionArg]
-  let returnType: StoredType?
 }
 
 struct FunctionArg {
@@ -125,6 +124,18 @@ class File {
   private(set) var prototypeMap = [String: Prototype]()
   private(set) var customTypes = [TypeDefinition]()
   private(set) var protocols = [ProtocolDefinition]()
+  
+  init() {
+    addExtern(Prototype(name: "printf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
+    
+    let printProto = Prototype(name: "print", params: [VariableDefinition(name: "line", type: StringStore())], returnType: VoidStore())
+    let printExprs: [TypedExpr] = [.call(FunctionCall(name: "printf",
+                                                      args: [FunctionArg(label: "format", expr: .literal(.string([.string("%s\n")])), typedExpr: .literal(.string([.string("%s\n")]), StringStore())),
+                                                             FunctionArg(label: "str", expr: .variable("line"), typedExpr: .variable("line", StringStore()))]), VoidStore())]
+    let function = FunctionDefinition(prototype: printProto, expr: [])
+    function.typedExpr = printExprs
+    addFunctionDefinition(function)
+  }
   
   func prototype(name: String) -> Prototype? {
     return prototypeMap[name]
