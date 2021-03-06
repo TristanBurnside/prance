@@ -35,7 +35,11 @@ public struct PranceCompiler {
     
     let file = try Parser(tokens: toks).parseFile()
     
-    let checkers: [ASTChecker.Type] = [TypeResolver.self, ProtocolConformanceChecker.self, FunctionCallChecker.self]
+    let checkers: [ASTChecker.Type] = [TypeResolver.self,
+                                       ProtocolConformanceChecker.self,
+                                       FunctionCallChecker.self,
+                                       FunctionReturnTypeChecker.self,
+                                       VariableDefinitionTypeChecker.self]
     try checkers.map { $0.init(file: file) }.forEach { try $0.check() }
     
     let irGen = IRGenerator(file: file)
