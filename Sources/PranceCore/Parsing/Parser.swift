@@ -108,6 +108,7 @@ enum ParseError: Error {
   case typeDoesNotContainMembers(String)
   case unexpectedArgumentInCall(got: String, expected: String)
   case wrongType(expectedType:String, for: String, got: String)
+  case returnTypeMismatch(expected: String, got: String)
 }
 
 extension String {

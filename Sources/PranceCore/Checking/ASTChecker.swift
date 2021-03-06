@@ -93,7 +93,9 @@ extension ASTChecker {
     case .whileLoop(let cond, let body, _):
       try checkRecursive(expr: cond, parameterValues: parameterValues, checker: checker)
       try body.forEach { try checkRecursive(expr: $0, parameterValues: parameterValues, checker: checker) }
-    case .literal, .variable, .variableDefinition:
+    case .variableDefinition(let definition, _):
+      parameterValues.addVariable(name: definition.name, type: definition.type, value: nil)
+    case .literal, .variable:
       break
     }
   }
