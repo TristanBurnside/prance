@@ -52,22 +52,17 @@ indirect enum TypedExpr {
   }
 }
 
-final class TypeResolver {
+final class TypeResolver: ASTChecker {
   
   let file: File
-  let allTypes: [String: CallableType]
-  var parameterValues: StackMemory = StackMemory()
+  let parameterValues: StackMemory = StackMemory()
   
   init(file: File) {
-    var allTypes = [String: CallableType]()
-    for type in file.customTypes {
-      allTypes[type.name] = type
-    }
-    for proto in file.protocols {
-      allTypes[proto.name] = proto
-    }
-    self.allTypes = allTypes
     self.file = file
+  }
+  
+  func check() throws {
+    try resolveTypes()
   }
   
   func resolveTypes() throws {
@@ -122,7 +117,7 @@ final class TypeResolver {
       let instanceWithType = try resolveType(of: instanceExpr)
       let instanceType = instanceWithType.type
       guard let definition = allTypes[instanceType.name] else {
-        throw ParseError.undefinedType(instanceType.name, FilePosition(line: 0, position: 0))
+        throw ParseError.typeDoesNotContainMembers(instanceType.name)
       }
       switch reference {
       case .property(let name):
@@ -136,14 +131,15 @@ final class TypeResolver {
           return functionCall.name == function.name
         }
         let newArgs = try functionCall.args.map { return FunctionArg(label: $0.label, expr: $0.expr, typedExpr: try resolveType(of: $0.expr)) }
-        let newCall = FunctionCall(name: functionCall.name, args: newArgs, returnType: functionCall.returnType)
+        let newCall = FunctionCall(name: functionCall.name, args: newArgs)
         let type = function?.returnType ?? VoidStore()
         return .memberDereference(instanceWithType, .function(newCall), type)
       }
     case .call(let functionCall):
+      let function = file.prototypeMap[functionCall.name]
       let newArgs = try functionCall.args.map { return FunctionArg(label: $0.label, expr: $0.expr, typedExpr: try resolveType(of: $0.expr)) }
-      let newCall = FunctionCall(name: functionCall.name, args: newArgs, returnType: functionCall.returnType)
-      return .call(newCall, functionCall.returnType ?? VoidStore())
+      let newCall = FunctionCall(name: functionCall.name, args: newArgs)
+      return .call(newCall, function?.returnType ?? VoidStore())
     case .return(let returnExpr):
       if let returnExpr = returnExpr {
         let typedReturn = try resolveType(of: returnExpr)

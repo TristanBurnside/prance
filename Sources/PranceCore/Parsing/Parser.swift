@@ -102,6 +102,7 @@ enum ParseError: Error {
   case invalidOperation(StoredType, StoredType, FilePosition)
   case undefinedType(String, FilePosition)
   case unableToAssignTo(Expr, FilePosition)
+  case typeDoesNotContainMembers(String)
 }
 
 extension String {
