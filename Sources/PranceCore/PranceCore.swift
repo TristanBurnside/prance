@@ -30,11 +30,17 @@ public struct PranceCompiler {
     
     let path = URL(fileURLWithPath: CommandLine.arguments[1])
     let input = try String(contentsOf: path, encoding: .utf8)
+    
     let toks = try Lexer().lex(input: input)
+    
     let file = try Parser(tokens: toks).parseFile()
-    try TypeResolver(file: file).resolveTypes()
+    
+    let checkers: [ASTChecker.Type] = [TypeResolver.self, ProtocolConformanceChecker.self, FunctionCallChecker.self]
+    try checkers.map { $0.init(file: file) }.forEach { try $0.check() }
+    
     let irGen = IRGenerator(file: file)
     try irGen.emit()
+    
     let llPath = path.deletingPathExtension().appendingPathExtension("ll")
     if FileManager.default.fileExists(atPath: llPath.path) {
       try FileManager.default.removeItem(at: llPath)
@@ -64,3 +70,4 @@ public struct PranceCompiler {
     try shellExecute("clang", objPath.path, "-o", execPath.path)
   }
 }
+
