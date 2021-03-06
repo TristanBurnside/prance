@@ -30,9 +30,9 @@ extension LeftParenToken: PostExpressable {
     }
     switch previousExpr {
     case .variable(let name):
-      return .call(FunctionCall(name: name, args: args, returnType: nil))
+      return .call(FunctionCall(name: name, args: args))
     case .memberDereference(let expr, .property(let name)):
-      return .memberDereference(expr, .function(FunctionCall(name: name, args: args, returnType: nil)))
+      return .memberDereference(expr, .function(FunctionCall(name: name, args: args)))
     default:
       throw ParseError.unexpectedToken(self, tokenStream.next()!.marker)
     }

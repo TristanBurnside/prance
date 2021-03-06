@@ -6,6 +6,23 @@ struct Prototype {
   let returnType: StoredType
 }
 
+extension Prototype: Equatable {
+  static func ==(lhs: Prototype, rhs: Prototype) -> Bool {
+    guard lhs.name == rhs.name else {
+      return false
+    }
+    guard lhs.returnType.name == rhs.returnType.name else {
+      return false
+    }
+    for (lhsParam, rhsParam) in zip(lhs.params, rhs.params) {
+      if lhsParam.name != rhsParam.name || lhsParam.type.name != rhsParam.type.name {
+        return false
+      }
+    }
+    return true
+  }
+}
+
 protocol CallableType {
   var IRType: StructType? { get set }
   var IRRef: PointerType? { get set }
@@ -79,7 +96,6 @@ final class FunctionDefinition {
 struct FunctionCall {
   let name: String
   let args: [FunctionArg]
-  let returnType: StoredType?
 }
 
 struct FunctionArg {
@@ -108,6 +124,18 @@ class File {
   private(set) var prototypeMap = [String: Prototype]()
   private(set) var customTypes = [TypeDefinition]()
   private(set) var protocols = [ProtocolDefinition]()
+  
+  init() {
+    addExtern(Prototype(name: "printf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
+    
+    let printProto = Prototype(name: "print", params: [VariableDefinition(name: "line", type: StringStore())], returnType: VoidStore())
+    let printExprs: [TypedExpr] = [.call(FunctionCall(name: "printf",
+                                                      args: [FunctionArg(label: "format", expr: .literal(.string([.string("%s\n")])), typedExpr: .literal(.string([.string("%s\n")]), StringStore())),
+                                                             FunctionArg(label: "str", expr: .variable("line"), typedExpr: .variable("line", StringStore()))]), VoidStore())]
+    let function = FunctionDefinition(prototype: printProto, expr: [])
+    function.typedExpr = printExprs
+    addFunctionDefinition(function)
+  }
   
   func prototype(name: String) -> Prototype? {
     return prototypeMap[name]

@@ -104,16 +104,6 @@ class IRGenerator {
     guard module.function(named: "printf") == nil else { return }
     let printfType = FunctionType([PointerType(pointee: IntType.int8)], IntType.int32, variadic: true)
     let _ = builder.addFunction("printf", type: printfType)
-    file.addExtern(Prototype(name: "printf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
-    
-    let printProto = Prototype(name: "print", params: [VariableDefinition(name: "line", type: StringStore())], returnType: VoidStore())
-    let printExprs: [TypedExpr] = [.call(FunctionCall(name: "printf",
-                                                      args: [FunctionArg(label: "format", expr: .literal(.string([.string("%s\n")])), typedExpr: .literal(.string([.string("%s\n")]), StringStore())),
-                                                             FunctionArg(label: "str", expr: .variable("line"), typedExpr: .variable("line", StringStore()))],
-                                                      returnType: nil), VoidStore())]
-    let function = FunctionDefinition(prototype: printProto, expr: [])
-    function.typedExpr = printExprs
-    file.addFunctionDefinition(function)
   }
   
   func defineType(_ type: TypeDefinition) {

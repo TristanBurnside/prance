@@ -2,3 +2,6 @@
 .swiftpm
 Prance.xcodeproj
 Package.resolved
+samples/demo
+samples/demo.ll
+samples/demo.o

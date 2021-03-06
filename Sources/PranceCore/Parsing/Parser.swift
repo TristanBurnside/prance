@@ -102,6 +102,12 @@ enum ParseError: Error {
   case invalidOperation(StoredType, StoredType, FilePosition)
   case undefinedType(String, FilePosition)
   case unableToAssignTo(Expr, FilePosition)
+  case unknownProtocol(String, in: String)
+  case unimplementedProtocol(String, in: String, missing: String)
+  case unknownFunction(String)
+  case typeDoesNotContainMembers(String)
+  case unexpectedArgumentInCall(got: String, expected: String)
+  case wrongType(expectedType:String, for: String, got: String)
 }
 
 extension String {
