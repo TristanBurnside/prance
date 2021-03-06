@@ -6,6 +6,23 @@ struct Prototype {
   let returnType: StoredType
 }
 
+extension Prototype: Equatable {
+  static func ==(lhs: Prototype, rhs: Prototype) -> Bool {
+    guard lhs.name == rhs.name else {
+      return false
+    }
+    guard lhs.returnType.name == rhs.returnType.name else {
+      return false
+    }
+    for (lhsParam, rhsParam) in zip(lhs.params, rhs.params) {
+      if lhsParam.name != rhsParam.name || lhsParam.type.name != rhsParam.type.name {
+        return false
+      }
+    }
+    return true
+  }
+}
+
 protocol CallableType {
   var IRType: StructType? { get set }
   var IRRef: PointerType? { get set }

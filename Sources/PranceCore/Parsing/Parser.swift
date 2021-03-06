@@ -102,6 +102,8 @@ enum ParseError: Error {
   case invalidOperation(StoredType, StoredType, FilePosition)
   case undefinedType(String, FilePosition)
   case unableToAssignTo(Expr, FilePosition)
+  case unknownProtocol(String, in: String)
+  case unimplementedProtocol(String, in: String, missing: String)
   case typeDoesNotContainMembers(String)
 }
 
