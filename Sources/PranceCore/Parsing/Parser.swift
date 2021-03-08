@@ -110,6 +110,7 @@ enum ParseError: Error {
   case unexpectedArgumentInCall(got: String, expected: String)
   case wrongType(expectedType:String, for: String, got: String)
   case returnTypeMismatch(expected: String, got: String)
+  case loopDeclarationMustIncludeComparison
 }
 
 extension String {
