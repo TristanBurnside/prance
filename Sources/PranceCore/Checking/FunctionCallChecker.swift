@@ -53,20 +53,4 @@ final class FunctionCallChecker: ASTChecker {
       try validateCallExpr(expr: passedArg.typedExpr)
     }
   }
-  
-  private func validTypeNames(for storedType: StoredType) -> [String] {
-    if let type = file.customTypes.first(where: { (type) -> Bool in
-      type.name == storedType.name
-    }) {
-      return [type.name]
-    }
-    if let proto = file.protocols.first(where: { (proto) -> Bool in
-      proto.name == storedType.name
-    }) {
-      let types = file.customTypes.filter { $0.protocols.contains(proto.name) }
-      let typeNames = types.map { $0.name }
-      return typeNames + [proto.name]
-    }
-    return [storedType.name]
-  }
 }

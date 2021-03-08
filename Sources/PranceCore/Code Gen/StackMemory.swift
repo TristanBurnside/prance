@@ -27,6 +27,16 @@ final class StackMemory {
     throw IRError.unknownVariable(name)
   }
   
+  func containsInCurrentFrame(_ name: String) -> Bool {
+    if frames.last?.variables[name] != nil {
+      return true
+    }
+    if frames.last?.statics[name] != nil {
+      return true
+    }
+    return false
+  }
+  
   func startFrame() {
     frames.append(StackFrame())
   }
