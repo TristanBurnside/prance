@@ -24,6 +24,22 @@ extension ASTChecker {
     return allTypes
   }
   
+  func validTypeNames(for storedType: StoredType) -> [String] {
+    if let type = file.customTypes.first(where: { (type) -> Bool in
+      type.name == storedType.name
+    }) {
+      return [type.name]
+    }
+    if let proto = file.protocols.first(where: { (proto) -> Bool in
+      proto.name == storedType.name
+    }) {
+      let types = file.customTypes.filter { $0.protocols.contains(proto.name) }
+      let typeNames = types.map { $0.name }
+      return typeNames + [proto.name]
+    }
+    return [storedType.name]
+  }
+  
   func checkExpr(checker: (TypedExpr, StackMemory) throws -> ()) rethrows {
     let parameterValues = StackMemory()
       for type in file.customTypes {
@@ -31,6 +47,7 @@ extension ASTChecker {
         parameterValues.addVariable(name: "self", type: CustomStore(name: type.name)!, value: nil)
         for function in type.functions {
           parameterValues.startFrame()
+          parameterValues.addVariable(name: ".return", type: function.prototype.returnType, value: nil)
           for arg in function.prototype.params {
             parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
           }
@@ -38,6 +55,7 @@ extension ASTChecker {
           parameterValues.endFrame()
         }
         parameterValues.startFrame()
+        parameterValues.addVariable(name: ".return", type: CustomStore(name: type.name)!, value: nil)
         for arg in type.initMethod.prototype.params {
           parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
         }
@@ -49,6 +67,7 @@ extension ASTChecker {
       parameterValues.startFrame()
       for function in file.functions {
         parameterValues.startFrame()
+        parameterValues.addVariable(name: ".return", type: function.prototype.returnType, value: nil)
         for arg in function.prototype.params {
           parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
         }
