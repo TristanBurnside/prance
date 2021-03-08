@@ -38,7 +38,16 @@ public struct PranceCompiler {
     let checkers: [ASTChecker.Type] = [TypeResolver.self,
                                        ProtocolConformanceChecker.self,
                                        FunctionCallChecker.self,
-                                       VariableDefinitionTypeChecker.self]
+                                       FunctionTypeChecker.self,
+                                       VariableDefinitionTypeChecker.self,
+                                       VariableAssignmentTypeChecker.self,
+                                       LoopChecker.self,
+                                       OperationChecker.self,
+                                       PropertyReferenceChecker.self,
+                                       ReturnTypeChecker.self,
+                                       PropertyTypeChecker.self,
+                                       DuplicateNameChecker.self]
+    
     try checkers.map { $0.init(file: file) }.forEach { try $0.check() }
     
     let irGen = IRGenerator(file: file)

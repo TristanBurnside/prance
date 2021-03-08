@@ -169,7 +169,7 @@ class IRGenerator {
   
   func internalPrototype(for prototype: Prototype, of type: CallableType) throws -> Prototype {
     // Add self arg reference
-    let internalName = type.name + "_" + prototype.name
+    let internalName = type.name + "." + prototype.name
     let selfType = CustomStore(name: type.name)!
     let internalParams = [VariableDefinition(name: "self", type: selfType)] + prototype.params
     return Prototype(name: internalName, params: internalParams, returnType: prototype.returnType)
