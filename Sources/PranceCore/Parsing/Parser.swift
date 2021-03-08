@@ -112,6 +112,9 @@ enum ParseError: Error {
   case returnTypeMismatch(expected: String, got: String)
   case loopDeclarationMustIncludeComparison
   case type(String, doesNotContainProperty: String)
+  case unexpectedReturn
+  case unreachableCode
+  case noReturnInFunction(String)
 }
 
 extension String {
