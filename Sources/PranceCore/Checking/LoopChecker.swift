@@ -17,16 +17,27 @@ final class LoopChecker: ASTChecker {
   func check() throws {
     try checkExpr { (expr, parameterValues) in
       var condition: TypedExpr? = nil
+      var loopBody: [TypedExpr]? = nil
       switch expr {
       case .ifelse(let cond, _, _, _):
         condition = cond
-      case .forLoop(_, let cond, _, _):
+      case .forLoop(_, let cond, let body, _):
         condition = cond
-      case .whileLoop(let cond, _, _):
+        loopBody = body
+      case .whileLoop(let cond, let body, _):
         condition = cond
+        loopBody = body
       default:
         return
       }
+      if let loopBody = loopBody {
+        try loopBody.forEach {
+          if case .return = $0 {
+            throw ParseError.unexpectedReturn
+          }
+        }
+      }
+      
       guard case .logical = condition else {
         throw ParseError.loopDeclarationMustIncludeComparison
       }

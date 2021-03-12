@@ -16,6 +16,7 @@ enum IRError: Error, CustomStringConvertible {
   case unknownType(String)
   case incorrectlyParsedLiteral
   case missingFunction(TypeDefinition, String)
+  case returnOutsideFunction
   
   var description: String {
     switch self {
@@ -45,6 +46,8 @@ enum IRError: Error, CustomStringConvertible {
       return "String literal was not parsed before generating LLVM IR"
     case .missingFunction(let type, let name):
       return "Type: \(type.name) is missing protocol function \(name)"
+    case .returnOutsideFunction:
+      return "Return statement executed outside of function body"
     }
   }
 }
@@ -59,11 +62,12 @@ class IRGenerator {
   let file: File
   let protocolType: StructType
   
-  private var parameterValues: StackMemory
+  private var parameterValues: StackMemory<IRValue>
   private var typesByIR: [(IRType, TypeDefinition)]
   private var typesByName: [String: CallableType]
   private var typesByID: [UInt32: TypeDefinition]
   private var nextTypeID: UInt32 = 0
+  private var currentReturnBlock: BasicBlock?
   
   init(moduleName: String = "main", file: File) {
     self.module = Module(name: moduleName)
@@ -190,16 +194,20 @@ class IRGenerator {
     
     for (idx, arg) in prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "entry")
+    let returnBlock = function.appendBasicBlock(named: "return")
+    currentReturnBlock = returnBlock
+    
     builder.positionAtEnd(of: entryBlock)
+    if prototype.returnType.name != VoidStore().name {
+      let _ = try emitExpr(.variableDefinition(VariableDefinition(name: ".return", type: prototype.returnType), VoidStore()))
+    }
     
-    let _ = try emitExpr(.variableDefinition(VariableDefinition(name: "return", type: prototype.returnType), VoidStore()))
-    
-    let (selfIR, _) = try parameterValues.findVariable(name: "self")
-    let typeIDRef = builder.buildStructGEP(selfIR!, type: protocolType, index: 0)
+    let selfIR = try parameterValues.findVariable(name: "self")
+    let typeIDRef = builder.buildStructGEP(selfIR, type: protocolType, index: 0)
     let typeID = builder.buildLoad(typeIDRef, type: typeIDRef.type.getResolvedType())
     
     for type in conformingTypes {
@@ -209,7 +217,6 @@ class IRGenerator {
       
       let thenBB = builder.currentFunction!.appendBasicBlock(named: "then")
       let elseBB = builder.currentFunction!.appendBasicBlock(named: "else")
-      let mergeBB = builder.currentFunction!.appendBasicBlock(named: "merge")
       
       builder.buildCondBr(condition: checkCond, then: thenBB, else: elseBB)
       
@@ -219,23 +226,31 @@ class IRGenerator {
         throw IRError.missingFunction(type, name)
       }
       // bitcast to type
-      let typedSelf = builder.buildCast(.bitCast, value: selfIR!, type: type.IRRef!)
+      let typedSelf = builder.buildCast(.bitCast, value: selfIR, type: type.IRRef!)
       // call type version of function
       let typedFunctionIR = try emitMember(prototype: typedFunction.prototype, of: type)
       var typedParameters = function.parameters
       typedParameters[0] = typedSelf
       let call = builder.buildCall(typedFunctionIR, args: typedParameters)
-      builder.buildStore(call, to: try parameterValues.findVariable(name: "return").0!)
       
-      builder.buildBr(mergeBB)
+      if prototype.returnType.name != VoidStore().name {
+        builder.buildStore(call, to: try parameterValues.findVariable(name: ".return"))
+      }
+      let _ = try emitExpr(.return(nil, prototype.returnType))
       
       builder.positionAtEnd(of: elseBB)
-      builder.buildBr(mergeBB)
-      
-      builder.positionAtEnd(of: mergeBB)
     }
     
-    let _ = try emitExpr(.return(.variable("return", prototype.returnType), prototype.returnType))
+    builder.buildUnreachable()
+    
+    builder.positionAtEnd(of: returnBlock)
+    if prototype.returnType.name == VoidStore().name {
+      builder.buildRetVoid()
+    } else {
+      let returnVar = try parameterValues.findVariable(name: ".return")
+      let returnVal = try value(from: returnVar, with: prototype.returnType)
+      builder.buildRet(returnVal)
+    }
     
     parameterValues.endFrame()
   }
@@ -265,17 +280,33 @@ class IRGenerator {
     
     for (idx, arg) in definition.prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "entry")
+    let returnBlock = function.appendBasicBlock(named: "return")
+    currentReturnBlock = returnBlock
+    
     builder.positionAtEnd(of: entryBlock)
+    
+    if definition.prototype.returnType.name != VoidStore().name {
+      let _ = try emitExpr(.variableDefinition(VariableDefinition(name: ".return", type: definition.prototype.returnType), VoidStore()))
+    }
     
     try definition.typedExpr.forEach { let _ = try emitExpr($0) }
     
     if definition.prototype.returnType is VoidStore,
       !(definition.expr.last is Returnable) {
       let _ = try emitExpr(.return(nil, VoidStore()))
+    }
+    
+    builder.positionAtEnd(of: returnBlock)
+    if definition.prototype.returnType.name == VoidStore().name {
+      builder.buildRetVoid()
+    } else {
+      let returnVar = try parameterValues.findVariable(name: ".return")
+      let returnVal = try value(from: returnVar, with: definition.prototype.returnType)
+      builder.buildRet(returnVal)
     }
     
     parameterValues.endFrame()
@@ -294,19 +325,32 @@ class IRGenerator {
     
     for (idx, arg) in definition.prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "alloc")
+    
+    let returnBlock = function.appendBasicBlock(named: "return")
+    currentReturnBlock = returnBlock
+    
     builder.positionAtEnd(of: entryBlock)
+    let _ = try emitExpr(.variableDefinition(VariableDefinition(name: ".return", type: definition.prototype.returnType), VoidStore()))
+    
     let selfPtr = builder.buildMalloc(llvmType)
-    parameterValues.addStatic(name: "self", value: selfPtr, type: CustomStore(name: type.name)!)
+    parameterValues.addStatic(name: "self", value: selfPtr)
     let typeIDPtr = builder.buildStructGEP(selfPtr, type: llvmType, index: 0)
     builder.buildStore(register(type: type), to: typeIDPtr)
     let arcPtr = builder.buildStructGEP(selfPtr, type: llvmType, index: 1)
     builder.buildStore(UInt32(0), to: arcPtr)
     
     try definition.typedExpr.forEach { let _ = try emitExpr($0) }
+    
+    builder.positionAtEnd(of: returnBlock)
+    let returnVar = try parameterValues.findVariable(name: ".return")
+    let returnVal = try value(from: returnVar, with: definition.prototype.returnType)
+    builder.buildRet(returnVal)
+    
+    parameterValues.endFrame()
     
     return function
   }
@@ -324,11 +368,11 @@ class IRGenerator {
     switch expr {
     case .variableDefinition(let definition, let type):
       let newVar = builder.buildAlloca(type: try definition.type.findRef(types: typesByName), name: definition.name)
-      parameterValues.addVariable(name: definition.name, type: definition.type, value: newVar)
+      parameterValues.addVariable(name: definition.name, value: newVar)
       return (VoidType().undef(), type)
-    case .variable(let name, _):
-      let (value, type) = try parameterValues.findVariable(name: name)
-      return (value!, type)
+    case .variable(let name, let type):
+      let value = try parameterValues.findVariable(name: name)
+      return (value, type)
     case .memberDereference(let instance, .property(let member), let type):
         let (instanceIR, instanceType) = try emitExpr(instance)
         guard let matchingType = typesByName[instanceType.name] else {
@@ -465,13 +509,15 @@ class IRGenerator {
       let function = try emitPrototype(prototype)
       return (builder.buildCall(function, args: callArgs), type)
     case .return(let expr, let type):
+      guard let returnBlock = currentReturnBlock else {
+        throw IRError.returnOutsideFunction
+      }
       if let expr = expr {
         let (innerVal, _) = try emitExprAndLoad(expr: expr)
-        return (builder.buildRet(innerVal), type)
-      } else {
-        return (builder.buildRetVoid(), type)
+        let returnVar = try parameterValues.findVariable(name: ".return")
+        builder.buildStore(innerVal, to: returnVar)
       }
-      
+      return (builder.buildBr(returnBlock), type)
     case .ifelse(let cond, let thenBlock, let elseBlock, let type):
       let (condition, _) = try emitExprAndLoad(expr: cond)
       let truthCondition = try condition.truthify(builder: builder)
@@ -487,11 +533,19 @@ class IRGenerator {
       
       builder.positionAtEnd(of: thenBB)
       try thenBlock.forEach { let _ = try emitExpr($0) }
-      builder.buildBr(mergeBB)
+      if case .return = thenBlock.last {
+        // No need to branch because we already returned
+      } else {
+        builder.buildBr(mergeBB)
+      }
       
       builder.positionAtEnd(of: elseBB)
       try elseBlock.forEach { let _ = try emitExpr($0) }
-      builder.buildBr(mergeBB)
+      if case .return = elseBlock.last {
+        // No need to branch because we already returned
+      } else {
+        builder.buildBr(mergeBB)
+      }
       
       builder.positionAtEnd(of: mergeBB)
       

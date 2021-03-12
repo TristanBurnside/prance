@@ -31,7 +31,7 @@ bar(x: 23.0, y: 27.0)
 fun ifFunc() Double {
   var x: Double
   if (51 == 50) {
-    x = 40.0
+    return 40.0
   } else {
     x = 0.0
     x = 2.0

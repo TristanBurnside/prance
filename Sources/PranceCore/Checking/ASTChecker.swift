@@ -40,24 +40,24 @@ extension ASTChecker {
     return [storedType.name]
   }
   
-  func checkExpr(checker: (TypedExpr, StackMemory) throws -> ()) rethrows {
-    let parameterValues = StackMemory()
+  func checkExpr(checker: (TypedExpr, StackMemory<StoredType>) throws -> ()) rethrows {
+    let parameterValues = StackMemory<StoredType>()
       for type in file.customTypes {
         parameterValues.startFrame()
-        parameterValues.addVariable(name: "self", type: CustomStore(name: type.name)!, value: nil)
+        parameterValues.addVariable(name: "self", value: CustomStore(name: type.name)!)
         for function in type.functions {
           parameterValues.startFrame()
-          parameterValues.addVariable(name: ".return", type: function.prototype.returnType, value: nil)
+          parameterValues.addVariable(name: ".return", value: function.prototype.returnType)
           for arg in function.prototype.params {
-            parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+            parameterValues.addVariable(name: arg.name, value: arg.type)
           }
           try function.typedExpr.forEach { try checkRecursive(expr: $0, parameterValues: parameterValues, checker: checker) }
           parameterValues.endFrame()
         }
         parameterValues.startFrame()
-        parameterValues.addVariable(name: ".return", type: CustomStore(name: type.name)!, value: nil)
+        parameterValues.addVariable(name: ".return", value: CustomStore(name: type.name)!)
         for arg in type.initMethod.prototype.params {
-          parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+          parameterValues.addVariable(name: arg.name, value: arg.type)
         }
         try type.initMethod.typedExpr.forEach { try checkRecursive(expr: $0, parameterValues: parameterValues, checker: checker) }
         parameterValues.endFrame()
@@ -67,9 +67,9 @@ extension ASTChecker {
       parameterValues.startFrame()
       for function in file.functions {
         parameterValues.startFrame()
-        parameterValues.addVariable(name: ".return", type: function.prototype.returnType, value: nil)
+        parameterValues.addVariable(name: ".return", value: function.prototype.returnType)
         for arg in function.prototype.params {
-          parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+          parameterValues.addVariable(name: arg.name, value: arg.type)
         }
         try function.typedExpr.forEach { try checkRecursive(expr: $0, parameterValues: parameterValues, checker: checker) }
         parameterValues.endFrame()
@@ -78,7 +78,7 @@ extension ASTChecker {
       parameterValues.endFrame()
     }
   
-  private func checkRecursive(expr: TypedExpr, parameterValues: StackMemory, checker: (TypedExpr, StackMemory) throws -> ()) rethrows {
+  private func checkRecursive(expr: TypedExpr, parameterValues: StackMemory<StoredType>, checker: (TypedExpr, StackMemory<StoredType>) throws -> ()) rethrows {
     try checker(expr, parameterValues)
     switch expr {
     case .binary(let left, _, let right, _):
@@ -113,7 +113,7 @@ extension ASTChecker {
       try checkRecursive(expr: cond, parameterValues: parameterValues, checker: checker)
       try body.forEach { try checkRecursive(expr: $0, parameterValues: parameterValues, checker: checker) }
     case .variableDefinition(let definition, _):
-      parameterValues.addVariable(name: definition.name, type: definition.type, value: nil)
+      parameterValues.addVariable(name: definition.name, value: definition.type)
     case .literal, .variable:
       break
     }

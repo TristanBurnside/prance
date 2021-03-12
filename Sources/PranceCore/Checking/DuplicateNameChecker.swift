@@ -47,7 +47,7 @@ final class DuplicateNameChecker: ASTChecker {
         if fileLevelNames.contains(definition.name) {
           throw ParseError.duplicateDefinition(of: definition.name)
         }
-        if let type = try? parameterValues.findVariable(name: "self").1,
+        if let type = try? parameterValues.findVariable(name: "self"),
            typeNameLists[type.name]?.contains(definition.name) ?? false {
           throw ParseError.duplicateDefinition(of: definition.name)
         }
