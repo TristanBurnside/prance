@@ -55,7 +55,7 @@ indirect enum TypedExpr {
 final class TypeResolver: ASTChecker {
   
   let file: File
-  let parameterValues: StackMemory = StackMemory()
+  let parameterValues: StackMemory = StackMemory<StoredType>()
   
   init(file: File) {
     self.file = file
@@ -68,18 +68,18 @@ final class TypeResolver: ASTChecker {
   func resolveTypes() throws {
     for type in file.customTypes {
       parameterValues.startFrame()
-      parameterValues.addVariable(name: "self", type: CustomStore(name: type.name)!, value: nil)
+      parameterValues.addVariable(name: "self", value: CustomStore(name: type.name)!)
       for function in type.functions {
         parameterValues.startFrame()
         for arg in function.prototype.params {
-          parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+          parameterValues.addVariable(name: arg.name, value: arg.type)
         }
         function.typedExpr = try resolveTypes(for: function.expr)
         parameterValues.endFrame()
       }
       parameterValues.startFrame()
       for arg in type.initMethod.prototype.params {
-        parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+        parameterValues.addVariable(name: arg.name, value: arg.type)
       }
       type.initMethod.typedExpr = try resolveTypes(for: type.initMethod.expr)
       parameterValues.endFrame()
@@ -90,7 +90,7 @@ final class TypeResolver: ASTChecker {
     for function in file.functions {
       parameterValues.startFrame()
       for arg in function.prototype.params {
-        parameterValues.addVariable(name: arg.name, type: arg.type, value: nil)
+        parameterValues.addVariable(name: arg.name, value: arg.type)
       }
       if function.typedExpr == nil {
         function.typedExpr = try resolveTypes(for: function.expr)
@@ -164,10 +164,10 @@ final class TypeResolver: ASTChecker {
       }
       return .logical(lhsTyped, op, rhsTyped, IntStore())
     case .variable(let name):
-      let variableType = try parameterValues.findVariable(name: name).1
+      let variableType = try parameterValues.findVariable(name: name)
       return .variable(name, variableType)
     case .variableDefinition(let definition):
-      parameterValues.addVariable(name: definition.name, type: definition.type, value: nil)
+      parameterValues.addVariable(name: definition.name, value: definition.type)
       return .variableDefinition(definition, VoidStore())
     case .variableAssignment(let variable, let value):
       let variableTyped = try resolveType(of: variable)

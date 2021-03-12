@@ -1,21 +1,21 @@
 import LLVM
 
-final class StackMemory {
-  private var frames: [StackFrame]
+final class StackMemory<Value> {
+  private var frames: [StackFrame<Value>]
   
   init() {
     frames = []
   }
   
-  func addStatic(name: String, value: IRValue, type: StoredType) {
-    frames.last?.statics[name] = (value, type)
+  func addStatic(name: String, value: Value) {
+    frames.last?.statics[name] = value
   }
   
-  func addVariable(name: String, type: StoredType, value: IRValue?) {
-    frames.last?.variables[name] = (value, type)
+  func addVariable(name: String, value: Value) {
+    frames.last?.variables[name] = value
   }
   
-  func findVariable(name: String) throws -> (IRValue?, StoredType) {
+  func findVariable(name: String) throws -> Value {
     for frame in frames.reversed() {
       if let variableRef = frame.variables[name] {
         return variableRef
@@ -38,7 +38,7 @@ final class StackMemory {
   }
   
   func startFrame() {
-    frames.append(StackFrame())
+    frames.append(StackFrame<Value>())
   }
   
   func endFrame() {
@@ -46,9 +46,9 @@ final class StackMemory {
   }
 }
 
-final class StackFrame {
-  var statics: [String: (IRValue, StoredType)]
-  var variables: [String: (IRValue?, StoredType)]
+final class StackFrame<Value> {
+  var statics: [String: Value]
+  var variables: [String: Value]
   
   init() {
     statics = [:]

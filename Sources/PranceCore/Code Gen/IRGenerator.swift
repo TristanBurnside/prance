@@ -59,7 +59,7 @@ class IRGenerator {
   let file: File
   let protocolType: StructType
   
-  private var parameterValues: StackMemory
+  private var parameterValues: StackMemory<IRValue>
   private var typesByIR: [(IRType, TypeDefinition)]
   private var typesByName: [String: CallableType]
   private var typesByID: [UInt32: TypeDefinition]
@@ -190,7 +190,7 @@ class IRGenerator {
     
     for (idx, arg) in prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "entry")
@@ -198,8 +198,8 @@ class IRGenerator {
     
     let _ = try emitExpr(.variableDefinition(VariableDefinition(name: "return", type: prototype.returnType), VoidStore()))
     
-    let (selfIR, _) = try parameterValues.findVariable(name: "self")
-    let typeIDRef = builder.buildStructGEP(selfIR!, type: protocolType, index: 0)
+    let selfIR = try parameterValues.findVariable(name: "self")
+    let typeIDRef = builder.buildStructGEP(selfIR, type: protocolType, index: 0)
     let typeID = builder.buildLoad(typeIDRef, type: typeIDRef.type.getResolvedType())
     
     for type in conformingTypes {
@@ -219,13 +219,13 @@ class IRGenerator {
         throw IRError.missingFunction(type, name)
       }
       // bitcast to type
-      let typedSelf = builder.buildCast(.bitCast, value: selfIR!, type: type.IRRef!)
+      let typedSelf = builder.buildCast(.bitCast, value: selfIR, type: type.IRRef!)
       // call type version of function
       let typedFunctionIR = try emitMember(prototype: typedFunction.prototype, of: type)
       var typedParameters = function.parameters
       typedParameters[0] = typedSelf
       let call = builder.buildCall(typedFunctionIR, args: typedParameters)
-      builder.buildStore(call, to: try parameterValues.findVariable(name: "return").0!)
+      builder.buildStore(call, to: try parameterValues.findVariable(name: "return"))
       
       builder.buildBr(mergeBB)
       
@@ -265,7 +265,7 @@ class IRGenerator {
     
     for (idx, arg) in definition.prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "entry")
@@ -294,13 +294,13 @@ class IRGenerator {
     
     for (idx, arg) in definition.prototype.params.enumerated() {
       let param = function.parameter(at: idx)!
-      parameterValues.addStatic(name: arg.name, value: param, type: arg.type)
+      parameterValues.addStatic(name: arg.name, value: param)
     }
     
     let entryBlock = function.appendBasicBlock(named: "alloc")
     builder.positionAtEnd(of: entryBlock)
     let selfPtr = builder.buildMalloc(llvmType)
-    parameterValues.addStatic(name: "self", value: selfPtr, type: CustomStore(name: type.name)!)
+    parameterValues.addStatic(name: "self", value: selfPtr)
     let typeIDPtr = builder.buildStructGEP(selfPtr, type: llvmType, index: 0)
     builder.buildStore(register(type: type), to: typeIDPtr)
     let arcPtr = builder.buildStructGEP(selfPtr, type: llvmType, index: 1)
@@ -324,11 +324,11 @@ class IRGenerator {
     switch expr {
     case .variableDefinition(let definition, let type):
       let newVar = builder.buildAlloca(type: try definition.type.findRef(types: typesByName), name: definition.name)
-      parameterValues.addVariable(name: definition.name, type: definition.type, value: newVar)
+      parameterValues.addVariable(name: definition.name, value: newVar)
       return (VoidType().undef(), type)
-    case .variable(let name, _):
-      let (value, type) = try parameterValues.findVariable(name: name)
-      return (value!, type)
+    case .variable(let name, let type):
+      let value = try parameterValues.findVariable(name: name)
+      return (value, type)
     case .memberDereference(let instance, .property(let member), let type):
         let (instanceIR, instanceType) = try emitExpr(instance)
         guard let matchingType = typesByName[instanceType.name] else {
