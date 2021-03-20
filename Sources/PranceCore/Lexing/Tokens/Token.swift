@@ -30,6 +30,7 @@ struct VariableToken: Tokenizable {}
 struct TypeToken: Tokenizable {}
 struct ProtocolToken: Tokenizable {}
 struct ExtensionToken: Tokenizable {}
+struct DefaultToken: Tokenizable {}
 struct IfToken: Tokenizable {}
 struct ThenToken: Tokenizable {}
 struct ElseToken: Tokenizable {}

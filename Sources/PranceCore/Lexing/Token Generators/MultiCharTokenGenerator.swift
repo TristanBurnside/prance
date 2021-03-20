@@ -29,6 +29,7 @@ class MultiCharTokenGenerator: TokenGenerator {
     "while": WhileToken(),
     "type": TypeToken(),
     "protocol": ProtocolToken(),
+    "default": DefaultToken(),
     "extension": ExtensionToken()
   ]
   

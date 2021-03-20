@@ -16,6 +16,28 @@ final class ProtocolConformanceChecker: ASTChecker {
   }
   
   func check() throws {
+    // Check for all protocol function implentations
+    try file.customTypes.map {
+      return ($0, $0.protocols)
+    }.flatMap { (type, protos) -> [(TypeDefinition, String)] in
+      return protos.map { (type, $0) }
+    }.map { (type, proto) -> (TypeDefinition, ProtocolDefinition) in
+      guard let protoDef = file.protocols.first(where: { $0.name == proto }) else {
+        throw ParseError.unknownProtocol(proto, in: type.name)
+      }
+      return (type, protoDef)
+    }.flatMap { (type, proto) in
+      return proto.prototypes.filter { proto.defaults[$0.name] == nil }.map { (type, proto.name, $0) }
+    }.filter { (type, protocolName, protocolFunction) -> Bool in
+      return !type.functions.contains(where: { (function) -> Bool in
+        function.prototype == protocolFunction
+      })
+    }
+    .forEach({ (type, protocolName, protocolFunction) in
+      throw ParseError.unimplementedProtocol(protocolName, in: type.name, missing: protocolFunction.name)
+    })
+  
+    // Add conformance stubs where relying on default implementatons
     try file.customTypes.map {
       return ($0, $0.protocols)
     }.flatMap { (type, protos) -> [(TypeDefinition, String)] in
@@ -27,12 +49,13 @@ final class ProtocolConformanceChecker: ASTChecker {
       return (type, protoDef)
     }.flatMap { (type, proto) in
       return proto.prototypes.map { (type, proto.name, $0) }
-    }.forEach({ (type, protocolName, protocolFunction) in
-      if !type.functions.contains(where: { (function) -> Bool in
+    }.filter { (type, protocolName, protocolFunction) -> Bool in
+      return !type.functions.contains(where: { (function) -> Bool in
         function.prototype == protocolFunction
-      }) {
-        throw ParseError.unimplementedProtocol(protocolName, in: type.name, missing: protocolFunction.name)
-      }
+      })
+    }
+    .forEach({ (type, protocolName, protocolFunction) in
+      type.protocolConformanceStubs.append((protocolName, protocolFunction))
     })
   }
 }

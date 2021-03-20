@@ -289,6 +289,9 @@ class IRGenerator {
     for function in type.functions {
       try emitMember(function: function, of: type)
     }
+    for (protocolName, prototype) in type.protocolConformanceStubs {
+      try emitMemberStub(prototype: prototype, of: type, conforms: protocolName)
+    }
   }
   
   func emitMain() throws {
@@ -315,6 +318,24 @@ class IRGenerator {
   }
   
   @discardableResult
+  func emitMemberStub(prototype: Prototype, of type: CallableType, conforms: String) throws -> Function {
+    guard let matchingType = typesByName[conforms] else {
+      throw IRError.unknownMemberFunction(prototype.name)
+    }
+    let prototypeFunction = try emitMember(prototype: prototype, of: matchingType)
+    
+    let function = try emitMember(prototype: prototype, of: type)
+    let entry = function.appendBasicBlock(named: "entry")
+    builder.positionAtEnd(of: entry)
+    let protocolSelf = builder.buildBitCast(function.parameter(at: 0)!, type: PointerType(pointee: protocolType))
+    let protocolParameters = [protocolSelf] + function.parameters.dropFirst()
+    let ret = builder.buildCall(prototypeFunction, args: protocolParameters)
+    builder.buildRet(ret)
+    return function
+  }
+  
+  
+  @discardableResult
   func emitMember(function: FunctionDefinition, of type: CallableType) throws -> Function {
     let llvmPrototype = try internalPrototype(for: function.prototype, of: type)
     let llvmFunction = FunctionDefinition(prototype: llvmPrototype, expr: function.expr)
@@ -335,11 +356,12 @@ class IRGenerator {
     
     for prototype in proto.prototypes {
       let internalDefinition = try internalPrototype(for: prototype, of: proto)
-      try emitProtocolMember(name: prototype.name, prototype: internalDefinition, conformingTypes: conformingTypes)
+      let defaultImpl = proto.defaults[prototype.name]
+      try emitProtocolMember(name: prototype.name, prototype: internalDefinition, conformingTypes: conformingTypes, defaultImpl: defaultImpl)
     }
   }
   
-  func emitProtocolMember(name: String, prototype: Prototype, conformingTypes: [TypeDefinition]) throws {
+  func emitProtocolMember(name: String, prototype: Prototype, conformingTypes: [TypeDefinition], defaultImpl: FunctionDefinition?) throws {
     let function = try emitPrototype(prototype)
     parameterValues.startFrame()
     
@@ -350,6 +372,7 @@ class IRGenerator {
     
     let entryBlock = function.appendBasicBlock(named: "entry")
     let returnBlock = function.appendBasicBlock(named: "return")
+    let defaultBlock = function.appendBasicBlock(named: "default")
     currentReturnBlock = returnBlock
     
     builder.positionAtEnd(of: entryBlock)
@@ -361,39 +384,39 @@ class IRGenerator {
     let typeIDRef = builder.buildStructGEP(selfIR, type: protocolType, index: 0)
     let typeID = builder.buildLoad(typeIDRef, type: typeIDRef.type.getResolvedType())
     
+    let typeSwitch = builder.buildSwitch(typeID, else: defaultBlock, caseCount: conformingTypes.count)
     for type in conformingTypes {
-      let checkCond = builder.buildICmp(typeID,
-                                        type.id!,
-                                        .equal)
-      
-      let thenBB = builder.currentFunction!.appendBasicBlock(named: "then")
-      let elseBB = builder.currentFunction!.appendBasicBlock(named: "else")
-      
-      builder.buildCondBr(condition: checkCond, then: thenBB, else: elseBB)
-      
-      builder.positionAtEnd(of: thenBB)
-      
-      guard let typedFunction = type.functions.first(where: { $0.prototype.name == name }) else {
-        throw IRError.missingFunction(type, name)
+      if let typedFunction = type.functions.first(where: { $0.prototype.name == name }) {
+        let typeBlock = function.appendBasicBlock(named: type.name)
+        builder.positionAtEnd(of: typeBlock)
+        // bitcast to type
+        let typedSelf = builder.buildCast(.bitCast, value: selfIR, type: type.IRRef!)
+        // call type version of function
+        let typedFunctionIR = try emitMember(prototype: typedFunction.prototype, of: type)
+        var typedParameters = function.parameters
+        typedParameters[0] = typedSelf
+        let call = builder.buildCall(typedFunctionIR, args: typedParameters)
+        
+        if prototype.returnType.name != VoidStore().name {
+          builder.buildStore(call, to: try parameterValues.findVariable(name: ".return"))
+        }
+        let _ = try emitExpr(.return(nil, prototype.returnType))
+        
+        typeSwitch.addCase(type.id!, typeBlock)
       }
-      // bitcast to type
-      let typedSelf = builder.buildCast(.bitCast, value: selfIR, type: type.IRRef!)
-      // call type version of function
-      let typedFunctionIR = try emitMember(prototype: typedFunction.prototype, of: type)
-      var typedParameters = function.parameters
-      typedParameters[0] = typedSelf
-      let call = builder.buildCall(typedFunctionIR, args: typedParameters)
-      
-      if prototype.returnType.name != VoidStore().name {
-        builder.buildStore(call, to: try parameterValues.findVariable(name: ".return"))
-      }
-      let _ = try emitExpr(.return(nil, prototype.returnType))
-      
-      builder.positionAtEnd(of: elseBB)
     }
     
-    builder.buildUnreachable()
-    
+    builder.positionAtEnd(of: defaultBlock)
+    if let defaultImpl = defaultImpl {
+      try defaultImpl.typedExpr.forEach { let _ = try emitExpr($0) }
+      if defaultImpl.prototype.returnType is VoidStore,
+        !(defaultImpl.expr.last is Returnable) {
+        let _ = try emitExpr(.return(nil, VoidStore()))
+      }
+    } else {
+      let _ = try emitExpr(.return(nil, VoidStore()))
+    }
+
     builder.positionAtEnd(of: returnBlock)
     if prototype.returnType.name == VoidStore().name {
       builder.buildRetVoid()

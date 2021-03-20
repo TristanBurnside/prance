@@ -86,6 +86,17 @@ final class TypeResolver: ASTChecker {
       parameterValues.endFrame()
     }
     
+    for proto in file.protocols {
+      for function in proto.defaults.values {
+        parameterValues.startFrame()
+        for arg in function.prototype.params {
+          parameterValues.addVariable(name: arg.name, value: arg.type)
+        }
+        function.typedExpr = try resolveTypes(for: function.expr)
+        parameterValues.endFrame()
+      }
+    }
+    
     parameterValues.startFrame()
     for function in file.functions {
       parameterValues.startFrame()
