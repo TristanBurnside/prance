@@ -17,6 +17,8 @@ jobs:
       run: brew install llvm@11
     - name: Get Dependencies
       run: swift package resolve
+    - name: Make pkgconfig
+      run: swift ./utils/make-pkgconfig.swift
     - name: Build
       run: swift build -v
     - name: Run tests
