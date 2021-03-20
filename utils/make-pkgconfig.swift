@@ -1,7 +1,7 @@
 /// This file taken from LLVM Swift for use in GitHub actions, 
 /// for the most up to date version see https://github.com/llvm-swift/LLVMSwift/blob/master/utils/make-pkgconfig.swift.
 
-#!/usr/bin/env swift
+//#!/usr/bin/env swift
 import Foundation
 
 #if os(Linux)
