@@ -170,3 +170,42 @@ extension IdentifierToken: PrototypeDefinable {
     return Prototype(name: name, params: params, returnType: returnType)
   }
 }
+
+protocol ExtensionDefinable {
+  func createExtension(from tokenString: TokenStream) throws -> ExtensionDefinition
+}
+
+extension ExtensionDefinable {
+  func createExtension(from tokenStream: TokenStream) throws -> ExtensionDefinition {
+    guard let nameToken = tokenStream.next()?.token as? IdentifierToken else {
+      let badToken = tokenStream.previous()
+      throw ParseError.unexpectedToken(badToken.token, badToken.marker)
+    }
+    
+    try tokenStream.skip(LeftBraceToken())
+    var properties = [(String, StoredType)]()
+    var functions = [FunctionDefinition]()
+    while let token = tokenStream.next()?.token as? MemberExpressable {
+      switch try token.expressMember(tokenStream: tokenStream) {
+      case .variable(let variable):
+        properties.append((variable.name, variable.type))
+      case .function(let function):
+        functions.append(function)
+      }
+    }
+    
+    return ExtensionDefinition(name: nameToken.name, functions: functions)
+  }
+}
+
+extension ExtensionToken: ExtensionDefinable, Definable {
+  func create(from tokenStream: TokenStream) throws -> Definition {
+    return .extend(try createExtension(from: tokenStream))
+  }
+}
+
+extension DefaultToken: ExtensionDefinable, Definable {
+  func create(from tokenStream: TokenStream) throws -> Definition {
+    return .defaultImpl(try createExtension(from: tokenStream))
+  }
+}

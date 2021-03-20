@@ -35,8 +35,9 @@ public struct PranceCompiler {
     
     let file = try Parser(tokens: toks).parseFile()
     
-    let checkers: [ASTChecker.Type] = [TypeResolver.self,
+    let checkers: [ASTChecker.Type] = [ExtensionResolver.self,
                                        ProtocolConformanceChecker.self,
+                                       TypeResolver.self,
                                        FunctionCallChecker.self,
                                        FunctionTypeChecker.self,
                                        VariableDefinitionTypeChecker.self,

@@ -116,6 +116,8 @@ enum ParseError: Error {
   case unreachableCode
   case noReturnInFunction(String)
   case duplicateDefinition(of: String)
+  case couldNotFindTypeForExtension(String)
+  case functionDoesNotMatchDeclaration(String, inType: String)
 }
 
 extension String {

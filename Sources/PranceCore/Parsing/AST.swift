@@ -37,11 +37,12 @@ final class TypeDefinition: CallableType {
   var IRType: StructType? = nil
   var IRRef: PointerType? = nil
   let properties: [(String, StoredType)]
-  let functions: [FunctionDefinition]
+  var functions: [FunctionDefinition]
   let protocols: [String]
+  var protocolConformanceStubs: [(String, Prototype)] = []
   
   var prototypes: [Prototype] {
-    return functions.map { $0.prototype }
+    return functions.map { $0.prototype } + protocolConformanceStubs.map { $0.1 }
   }
   
   init(name: String, properties: [(String, StoredType)], functions: [FunctionDefinition], protocols: [String]) {
@@ -74,11 +75,22 @@ final class ProtocolDefinition: CallableType {
   var IRRef: PointerType? = nil
   let properties: [(String, StoredType)]
   var prototypes: [Prototype]
+  var defaults: [String: FunctionDefinition] = [:]
   
   init(name: String, properties: [(String, StoredType)], prototypes: [Prototype]) {
     self.name = name
     self.properties = properties
     self.prototypes = prototypes
+  }
+}
+
+final class ExtensionDefinition {
+  let name: String
+  let functions: [FunctionDefinition]
+  
+  init(name: String, functions: [FunctionDefinition]) {
+    self.name = name
+    self.functions = functions
   }
 }
 
@@ -114,6 +126,8 @@ enum Definition {
   case extern(Prototype)
   case type(TypeDefinition)
   case proto(ProtocolDefinition)
+  case extend(ExtensionDefinition)
+  case defaultImpl(ExtensionDefinition)
 }
 
 class File {
@@ -124,6 +138,8 @@ class File {
   private(set) var prototypeMap = [String: Prototype]()
   private(set) var customTypes = [TypeDefinition]()
   private(set) var protocols = [ProtocolDefinition]()
+  private(set) var extensions = [ExtensionDefinition]()
+  private(set) var defaults = [ExtensionDefinition]()
   
   init() {
     addExtern(Prototype(name: "printf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
@@ -162,6 +178,10 @@ class File {
       addType(type)
     case .proto(let proto):
       addProtocol(proto)
+    case .extend(let extend):
+      addExtension(extend)
+    case .defaultImpl(let def):
+      addDefault(def)
     }
   }
   
@@ -177,6 +197,14 @@ class File {
   
   func addProtocol(_ proto: ProtocolDefinition) {
     protocols.append(proto)
+  }
+  
+  func addExtension(_ extend: ExtensionDefinition) {
+    extensions.append(extend)
+  }
+  
+  func addDefault(_ def: ExtensionDefinition) {
+    defaults.append(def)
   }
 }
 

@@ -138,7 +138,15 @@ protocol Speaker {
   fun speak() String
 }
 
+default Speaker {
+  fun speak() String {
+    return "<No noise detected>"
+  }
+}
+
 type Dog: Speaker {
+}
+extension Dog {
   fun speak() String {
     return "Woof"
   }
@@ -150,12 +158,19 @@ type Human: Speaker {
   }
 }
 
+type Insect: Speaker {}
+
 fun speaking() {
   var speaker: Speaker
   speaker = Dog()
   print(line: speaker.speak())
   speaker = Human()
   print(line: speaker.speak())
+  speaker = Insect()
+  print(line: speaker.speak())
+  var insect: Insect
+  insect = Insect()
+  print(line: insect.speak())
 }
 
 speaking()
