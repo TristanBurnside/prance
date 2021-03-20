@@ -82,10 +82,13 @@ class IRGenerator {
   }
   
   func emit() throws {
-    let _ = emitPrintf()
+    emitPrintf()
+    emitScanf()
     for extern in file.externs {
       try emitPrototype(extern)
     }
+    try emitCopyStr()
+    try emitScanLine()
     for type in file.customTypes {
       defineType(type)
     }
@@ -108,6 +111,150 @@ class IRGenerator {
     guard module.function(named: "printf") == nil else { return }
     let printfType = FunctionType([PointerType(pointee: IntType.int8)], IntType.int32, variadic: true)
     let _ = builder.addFunction("printf", type: printfType)
+  }
+  
+  func emitScanf() {
+    guard module.function(named: "scanf") == nil else { return }
+    let printfType = FunctionType([PointerType(pointee: IntType.int8)], IntType.int32, variadic: true)
+    let _ = builder.addFunction("scanf", type: printfType)
+  }
+  
+  func emitScanLine() throws {
+    guard let prototype = file.prototypeMap["scanLine"] else {
+      return
+    }
+    
+    guard let copyFunc = module.function(named: ".copyStr") else {
+      throw IRError.unknownFunction(".copyStr")
+    }
+    
+    let function = try emitPrototype(prototype)
+    
+    parameterValues.startFrame()
+    
+    for (idx, arg) in prototype.params.enumerated() {
+      let param = function.parameter(at: idx)!
+      parameterValues.addStatic(name: arg.name, value: param)
+    }
+    
+    let entryBlock = function.appendBasicBlock(named: "entry")
+    builder.positionAtEnd(of: entryBlock)
+    
+    //Body
+    
+    // create temp
+    let section = builder.buildAlloca(type: ArrayType(elementType: IntType.int8, count: 20))
+    let format = builder.buildGlobalStringPtr("%19s%n")
+    let scannedChars = builder.buildAlloca(type: IntType.int32)
+    let resultChars = builder.buildAlloca(type: IntType.int32)
+    let resultSize = builder.buildAlloca(type: IntType.int32)
+    let resultPtr = builder.buildAlloca(type: PointerType(pointee: IntType.int8))
+    let initialResult = builder.buildMalloc(IntType.int8, count: UInt32(20))
+    builder.buildStore(UInt32(0), to: resultChars)
+    builder.buildStore(UInt32(20), to: resultSize)
+    builder.buildStore(initialResult, to: resultPtr)
+    guard let scanf = file.prototypeMap["scanf"] else {
+      throw IRError.unknownFunction("scanf")
+    }
+    let scanfFunction = try emitPrototype(scanf)
+    
+    // while more chars
+    let scanBlock = function.appendBasicBlock(named: "scan")
+    let addSpaceBlock = function.appendBasicBlock(named: "addSpace")
+    let saveBlock = function.appendBasicBlock(named: "save")
+    let endScanBlock = function.appendBasicBlock(named: "end_scan")
+    let returnBlock = function.appendBasicBlock(named: "return")
+    builder.buildBr(scanBlock)
+    builder.positionAtEnd(of: scanBlock)
+    // scanf
+    let args: [IRValue] = [format, section, scannedChars]
+    let _ = builder.buildCall(scanfFunction, args: args)
+    let scannedCharsValue = builder.buildLoad(scannedChars, type: IntType.int32)
+    // save partial
+    let oldResultCharsVal = builder.buildLoad(resultChars, type: IntType.int32)
+    let newResultCharsVal = builder.buildAdd(oldResultCharsVal, scannedCharsValue)
+    builder.buildStore(newResultCharsVal, to: resultChars)
+    let resultSizeVal = builder.buildLoad(resultSize, type: IntType.int32)
+    let needSpace = builder.buildICmp(newResultCharsVal, resultSizeVal, .signedGreaterThan)
+    let currentCharPtr = builder.buildAlloca(type: IntType.int32)
+    builder.buildStore(UInt32(0), to: currentCharPtr)
+    builder.buildCondBr(condition: needSpace, then: addSpaceBlock, else: saveBlock)
+    
+    builder.positionAtEnd(of: addSpaceBlock)
+    let oldResult = builder.buildLoad(resultPtr, type: PointerType(pointee: IntType.int8))
+    let oldResultSize = builder.buildLoad(resultSize, type: IntType.int32)
+    let newResultSize = builder.buildMul(oldResultSize, UInt32(2), overflowBehavior: .noUnsignedWrap)
+    let newResult = builder.buildMalloc(IntType.int8, count: newResultSize)
+    let _ = builder.buildCall(copyFunc, args: [oldResult, newResult, oldResultSize])
+    builder.buildStore(newResultSize, to: resultSize)
+    builder.buildStore(newResult, to: resultPtr)
+    builder.buildFree(oldResult)
+    builder.buildBr(saveBlock)
+    
+    builder.positionAtEnd(of: saveBlock)
+    let nextCharPtr = builder.buildLoad(resultPtr, type: PointerType(pointee: IntType.int8))
+    let nextChar = builder.buildGEP(nextCharPtr, type: IntType.int8, indices: [oldResultCharsVal])
+    let scannedCharPtr = builder.buildGEP(section, type: IntType.int8, indices: [UInt32(0)])
+    let _ = builder.buildCall(copyFunc, args: [scannedCharPtr, nextChar, scannedCharsValue])
+    builder.buildBr(endScanBlock)
+    
+    // end while
+    builder.positionAtEnd(of: endScanBlock)
+    let cont = builder.buildICmp(scannedCharsValue, UInt32(19), .equal)
+    builder.buildCondBr(condition: cont, then: scanBlock, else: returnBlock)
+    // allocate mem for output
+    builder.positionAtEnd(of: returnBlock)
+    // return
+    let result = builder.buildLoad(resultPtr, type: (resultPtr.type as! PointerType).pointee)
+    let resultCharsCount = builder.buildAdd(newResultCharsVal, UInt32(1))
+    let retBuffer = builder.buildMalloc(IntType.int8, count: resultCharsCount)
+
+    let _ = builder.buildCall(copyFunc, args: [result, retBuffer, resultCharsCount])
+    builder.buildFree(result)
+    builder.buildRet(retBuffer)
+    parameterValues.endFrame()
+  }
+  
+  func emitCopyStr() throws {
+    let function = module.addFunction(".copyStr", type: FunctionType([PointerType(pointee: IntType.int8),
+                                                                      PointerType(pointee: IntType.int8),
+                                                                      IntType.int32], VoidType()))
+    let entry = function.appendBasicBlock(named: "entry")
+    let copy = function.appendBasicBlock(named: "copy")
+    let returnBlock = function.appendBasicBlock(named: "return")
+    builder.positionAtEnd(of: entry)
+    let currentChar = builder.buildAlloca(type: IntType.int32)
+    builder.buildStore(UInt32(0), to: currentChar)
+    guard let fromStr = function.parameter(at: 0),
+          let toStr = function.parameter(at: 1),
+          let charsToCopy = function.parameter(at: 2) else {
+      throw IRError.wrongNumberOfArgs("copyStr", expected: 3, got: 2)
+    }
+    builder.buildBr(copy)
+    builder.positionAtEnd(of: copy)
+    let currentCharValue = builder.buildLoad(currentChar, type: IntType.int32)
+    let from = builder.buildGEP(fromStr, type: IntType.int8, indices: [currentCharValue])
+    let to = builder.buildGEP(toStr, type: IntType.int8, indices: [currentCharValue])
+    let fromValue = builder.buildLoad(from, type: IntType.int8)
+    builder.buildStore(fromValue, to: to)
+    let newChar = builder.buildAdd(currentCharValue, UInt32(1))
+    builder.buildStore(newChar, to: currentChar)
+    let cont = builder.buildICmp(charsToCopy, newChar, .equal)
+    builder.buildCondBr(condition: cont, then: returnBlock, else: copy)
+    builder.positionAtEnd(of: returnBlock)
+    builder.buildRetVoid()
+  }
+  
+  func debugPrint(value: IRValue) {
+    let printValue: IRValue
+    if let type = value.type as? PointerType {
+      printValue = builder.buildLoad(value, type: type.pointee)
+    } else {
+      printValue = value
+    }
+    guard let printf = module.function(named: "printf") else { return }
+    let format = builder.buildGlobalStringPtr("%d\n")
+    _ = builder.buildCall(printf, args: [format, printValue])
   }
   
   func defineType(_ type: TypeDefinition) {
@@ -145,6 +292,10 @@ class IRGenerator {
   }
   
   func emitMain() throws {
+    parameterValues.startFrame()
+    defer {
+      parameterValues.endFrame()
+    }
     let mainType = FunctionType([], VoidType())
     let function = builder.addFunction("main", type: mainType)
     let entry = function.appendBasicBlock(named: "entry")

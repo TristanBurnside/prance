@@ -127,6 +127,8 @@ class File {
   
   init() {
     addExtern(Prototype(name: "printf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
+    addExtern(Prototype(name: "scanf", params: [VariableDefinition(name: "format", type: StringStore()), VariableDefinition(name: "str", type: StringStore())], returnType: VoidStore()))
+    addExtern(Prototype(name: "scanLine", params: [], returnType: StringStore()))
     
     let printProto = Prototype(name: "print", params: [VariableDefinition(name: "line", type: StringStore())], returnType: VoidStore())
     let printExprs: [TypedExpr] = [.call(FunctionCall(name: "printf",
