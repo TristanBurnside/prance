@@ -53,6 +53,10 @@ ifFunc()
 // make prints explicit only - done
 print(line: "Hello world")
 print(line: "Second line")
+
+var line: String
+line = scanLine()
+print(line: line)
 // switch
 
 // structs - done
