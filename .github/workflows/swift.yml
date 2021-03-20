@@ -15,6 +15,10 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install LLVM
       run: brew install llvm@11
+    - name: Get Dependencies
+      run: swift package resolve
+    - name: Link LLVM
+      run: swift ./DerivedData/prance/SourcePackages/checkouts/LLVMSwift/utils/make-pkgconfig.swift
     - name: Build
       run: swift build -v
     - name: Run tests
